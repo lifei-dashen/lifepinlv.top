@@ -366,7 +366,7 @@
         }
     };
 
-    const quiz = {
+   const quiz = {
         idx: 0,
         history: [],
         dimScores: { A:0, B:0, C:0, D:0, E:0, F:0 },
@@ -389,7 +389,6 @@
                 b.className = 'opt-btn';
                 b.innerText = opt.t;
                 
-                // 动态色逻辑：低频显红/灰，高频显蓝/紫
                 let activeColor = '#00f2ff';
                 if(opt.s < 200) activeColor = '#ff4757';
                 if(opt.s >= 500) activeColor = '#e056fd';
@@ -422,14 +421,14 @@
 
         finish() {
             sys.nav('page-load');
-            // 安全延迟，防止计算错误卡死
+            // 延时2秒模拟计算，防止立即跳转导致的闪烁
             setTimeout(() => {
                 try { this.calc(); } 
                 catch(e) { console.error(e); sys.restart(); }
             }, 2000);
         },
 
-       calc() {
+        calc() {
             let total = this.history.reduce((a,b)=>a+b.s,0);
             let avg = Math.round(total / 40);
             if(avg > 700) avg = 700; if(avg < 20) avg = 20;
@@ -451,29 +450,12 @@
                 if(dims[k] < dims[minK]) minK = k;
             }
 
-            // 直接调用渲染，页面跳转逻辑已移入 renderResult 内部
             this.renderResult(avg, myLvl, dims, maxK, minK);
-        },
-
-            let dims = {};
-            for(let k in this.dimScores) {
-                let count = QUESTIONS.filter(q=>q.d===k).length;
-                dims[k] = Math.round(this.dimScores[k] / count);
-            }
-            
-            let maxK = 'A', minK = 'A';
-            for(let k in dims) {
-                if(dims[k] > dims[maxK]) maxK = k;
-                if(dims[k] < dims[minK]) minK = k;
-            }
-
-            this.renderResult(avg, myLvl, dims, maxK, minK);
-            sys.nav('page-result');
+            // 注意：这里去掉了 sys.nav('page-result')，移到了 renderResult 内部的第一行
         },
 
         renderResult(score, level, dims, maxK, minK) {
-            // 【核心修复1】先强制显示结果页，让浏览器知道容器的大小
-            // 否则手机上 Chart.js 会因为容器高度为0而报错卡死
+            // 【关键修复】：先显示页面，让浏览器知道容器大小，再画图
             sys.nav('page-result');
 
             // 1. 分数圆圈
@@ -483,7 +465,7 @@
             circle.style.boxShadow = `0 0 50px ${level.c}55, inset 0 0 20px ${level.c}22`;
             
             document.getElementById('final-score').innerText = score;
-            document.getElementById('final-state').innerText = level.n.split(' ')[0] + "态";
+            document.getElementById('final-state').innerText = level.n;
             document.getElementById('final-state').style.color = level.c;
             document.getElementById('final-desc').innerText = level.desc;
 
@@ -495,14 +477,13 @@
                 row.className = 'ladder-row';
                 if (l.v === level.v) {
                     row.classList.add('active');
-                    // 实心渐变
                     row.style.background = `linear-gradient(90deg, ${l.c}, ${l.c}aa)`;
                     row.style.boxShadow = `0 5px 25px ${l.c}66`;
                     row.innerHTML = `
                         <div style="display:flex;align-items:center;"><span style="width:30px;">${l.v}</span><span>${l.n.split(' ')[0]}</span></div>
                         <div class="tag" style="color:${l.c}">YOUR STATE</div>
                     `;
-                    // 延迟滚动，确保页面已经完全渲染
+                    // 延迟滚动，确保页面渲染完毕
                     setTimeout(()=>row.scrollIntoView({behavior:'smooth',block:'center'}), 500);
                 } else {
                     row.style.color = l.c;
@@ -514,50 +495,43 @@
             // 3. 深度文案
             document.getElementById('analysis-content').innerHTML = this.getDetailedReport(score, level, dims, maxK, minK);
 
-            // 【核心修复2】给画图加延时和容错处理
-            // 使用 setTimeout 0 确保 DOM 布局已完成
+            // 4. 雷达图 【关键修复：加延时，防止手机端报错卡死】
             setTimeout(() => {
-                try {
-                    const ctx = document.getElementById('radarChart').getContext('2d');
-                    if(window.myRadar) window.myRadar.destroy();
-                    
-                    window.myRadar = new Chart(ctx, {
-                        type: 'radar',
-                        data: {
-                            labels: Object.values(DIM_NAMES),
-                            datasets: [{
-                                label: '能量维度',
-                                data: Object.values(dims),
-                                backgroundColor: `${level.c}33`, 
-                                borderColor: level.c,
-                                borderWidth: 2,
-                                pointBackgroundColor: '#fff'
-                            }]
+                const ctx = document.getElementById('radarChart').getContext('2d');
+                if(window.myRadar) window.myRadar.destroy();
+                
+                window.myRadar = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: Object.values(DIM_NAMES),
+                        datasets: [{
+                            label: '能量维度',
+                            data: Object.values(dims),
+                            backgroundColor: `${level.c}33`, 
+                            borderColor: level.c,
+                            borderWidth: 2,
+                            pointBackgroundColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            r: {
+                                angleLines: { color: 'rgba(255,255,255,0.1)' },
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                pointLabels: { color: '#8a9bbd', font:{size:11} },
+                                ticks: { display: false, max: 700 }
+                            }
                         },
-                        options: {
-                            scales: {
-                                r: {
-                                    angleLines: { color: 'rgba(255,255,255,0.1)' },
-                                    grid: { color: 'rgba(255,255,255,0.1)' },
-                                    pointLabels: { color: '#8a9bbd', font:{size:11} },
-                                    ticks: { display: false, max: 700 }
-                                }
-                            },
-                            plugins: { legend: { display: false } },
-                            maintainAspectRatio: false
-                        }
-                    });
-                } catch (err) {
-                    console.error("图表渲染失败，但不影响结果显示:", err);
-                }
-            }, 50);
+                        plugins: { legend: { display: false } },
+                        maintainAspectRatio: false
+                    }
+                });
+            }, 100); // 延时100毫秒绘图
         },
 
-        // 生成深度报告的函数
         getDetailedReport(score, level, dims, maxK, minK) {
             const tName = DIM_NAMES[maxK], bName = DIM_NAMES[minK];
             
-            // 整体评测逻辑
             let overallText = "";
             if (score >= 500) overallText = "您正处于极高频的生命流中。在这个层级，生命不再是奋斗，而是自动发生的奇迹。您的存在本身就是对他人的疗愈。";
             else if (score >= 350) overallText = "您拥有非常宽广和理性的生命视野。您已经超越了情绪的控制，成为了自己命运的主人。生活对您来说是友好的、充满机遇的。";
@@ -594,3 +568,4 @@
 </script>
 </body>
 </html>
+
