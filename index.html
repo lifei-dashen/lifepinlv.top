@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>生命频率与内在状态测试</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
     <style>
         /* ================= 1. 核心视觉 (深空极光) ================= */
         :root {
@@ -86,11 +88,12 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             margin-bottom: 20px;
         }
-        .spacing-control {
-            height: 25px; /* 控制核心间距 */
-            visibility: hidden; /* 隐藏但保留空间 */
-            }
-        
+
+.spacing-control {
+    height: 25px; /* 控制核心间距 */
+    visibility: hidden; /* 隐藏但保留空间 */
+}
+
         .btn-primary {
             background: linear-gradient(90deg, #00c6ff, #0072ff);
             border: none; color: #fff; font-weight: bold;
@@ -186,8 +189,8 @@
             
             <input type="text" id="pass-code" class="login-inp" placeholder="请输入兑换码">
             <button class="btn-primary" onclick="sys.login()">立即开启</button>
-            
-            <div class="spacing-control"></div>
+
+	<div class="spacing-control"></div>
     <div class="link-container">
         <a href="https://xhslink.com/m/4i59U4BSzkf" target="_blank" class="btn-xhs-link">没有兑换码？去小红书获取 &gt;</a>
     </div>
@@ -206,7 +209,7 @@
             <p style="font-size:17px; color:var(--text-sub); margin-bottom:8px;">万物皆有频率</p>
             <p style="font-size:17px; color:var(--text-sub); margin-bottom:60px;">你的生命正在以多少赫兹振动?</p>
             
-            <div style="width:240px; margin: 0 auto 20px auto;">
+         <div style="width:240px; margin: 0 auto 20px auto;">
                 <button class="btn-primary" onclick="sys.nav('page-quiz')">开始探索</button>
             </div>
             <div style="font-size:13px; color:#999; line-height: 1.8; opacity: 0.8;">基于霍金斯能量层级研发<br> 40道心灵拷问 · 深度觉察内在状态</div>
@@ -214,7 +217,7 @@
         </div>
     </div>
 
-    <div id="page-quiz" class="page">
+<div id="page-quiz" class="page">
         <div class="quiz-container-pc" style="width:100%; height:100%; display:flex; flex-direction:column;">
             <div class="progress-bar"><div id="progress" class="progress-fill"></div></div>
             
@@ -223,9 +226,11 @@
                 <span id="q-idx" style="color:var(--text-sub); font-size:13px;">01 / 40</span>
             </div>
 
-            <div class="glass-card" style="flex:1; display:flex; flex-direction:column;">
-                <div id="q-text" style="font-size:20px; line-height:1.6; font-weight:500; margin-bottom:30px;">题目加载中...</div>
+            <div class="glass-card" style="flex:1; display:flex; flex-direction:column; justify-content:flex-start;">
+                <div id="q-text" style="font-size:20px; line-height:1.6; font-weight:500; margin-bottom:25px;">题目加载中...</div>
+                
                 <div id="opt-box"></div>
+                
                 <div style="margin-top: 30px; padding-top: 10px; border-top:1px solid rgba(255,255,255,0.05);">
                     <button onclick="quiz.prev()" style="background:transparent; border:1px solid rgba(255,255,255,0.2); color:#888; padding:8px 20px; border-radius:20px; cursor:pointer; font-size:13px; display:flex; align-items:center; gap:5px;">
                         <span>←</span> 上一题
@@ -347,25 +352,78 @@
         { q: "40. 如果用一个词形容你现在的生命状态？", d:"F", o:[{t:"绽放 (Flow)", s:500}, {t:"奋斗 (Struggle)", s:175}, {t:"成长 (Growth)", s:350}, {t:"生存 (Survival)", s:50}] }
     ];
 
-    // ================= 系统逻辑 =================
+       // ================= 系统逻辑 (已升级为服务器验证版) =================
     const sys = {
         init() {
             // 修复：每次进入先清理旧状态，防止卡死
             localStorage.removeItem('hawkins_auth');
             document.getElementById('page-login').classList.add('active');
         },
-        login() {
+        
+async login() {
             const input = document.getElementById('pass-code');
+            const msg = document.getElementById('login-msg');
+            const btn = document.querySelector('.btn-primary');
+            
             const val = input.value.trim().toUpperCase(); 
-            // 修复：去空格+大写，兼容  "1660"
-            if ( val === "1660") {
-                this.nav('page-home');
-            } else {
-                const msg = document.getElementById('login-msg');
+            
+            if (!val) {
+                msg.innerText = "请输入兑换码";
                 msg.style.opacity = 1;
-                setTimeout(() => msg.style.opacity = 0, 2000);
+                return;
+            }
+
+            btn.innerText = "正在验证...";
+            btn.disabled = true;
+            msg.style.opacity = 0;
+
+            // === 核心修改：获取本地存储的设备印章 ===
+            // 试图从浏览器里找，看以前有没有存过这个码对应的印章
+            const localToken = localStorage.getItem('token_' + val) || '';
+
+            try {
+                const response = await fetch('http://149.28.94.74:5000/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    // 发送时，把印章也带上
+                    body: JSON.stringify({ 
+                        code: val,
+                        device_token: localToken
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.valid) {
+                    // === 核心修改：如果服务器返回了新印章，存起来 ===
+                    if (result.token) {
+                        localStorage.setItem('token_' + val, result.token);
+                    }
+
+                    msg.style.color = "#00f2ff";
+                    msg.innerText = result.msg; // 显示“激活成功”或“欢迎回来”
+                    msg.style.opacity = 1;
+                    
+                    setTimeout(() => {
+                        this.nav('page-home');
+                    }, 500);
+                } else {
+                    msg.style.color = "#ff4757";
+                    msg.innerText = result.msg;
+                    msg.style.opacity = 1;
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                msg.style.color = "#ff4757";
+                msg.innerText = "连接服务器失败";
+                msg.style.opacity = 1;
+            } finally {
+                btn.innerText = "立即开启";
+                btn.disabled = false;
             }
         },
+
         nav(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             const t = document.getElementById(id);
@@ -577,12 +635,11 @@
     };
 
     sys.init();
+
+
 </script>
 </body>
+
 </html>
-
-
-
-
 
 
