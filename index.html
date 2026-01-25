@@ -382,7 +382,7 @@ async login() {
             const localToken = localStorage.getItem('token_' + val) || '';
 
             try {
-                const response = await fetch('https://api.lifepinlv.top:2096/verify', {
+                const response = await fetch('https://api.lifepinlv.top/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     // 发送时，把印章也带上
@@ -641,6 +641,7 @@ async login() {
 </body>
 
 </html>
+
 
 
 
